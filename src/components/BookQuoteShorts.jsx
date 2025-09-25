@@ -28,7 +28,6 @@ const apiService = {
           'Content-Type': 'application/json',
         },
       });
-      console.log("response",response.data);
       
       if (response.status!=200) throw new Error('Failed to like quote');
       return await response.data.data;
@@ -81,7 +80,6 @@ const BookQuoteShorts = () => {
       setLoading(true);
       setError(null);
       const quotesData = await apiService.getQuotesList();
-      console.log("quotes==",quotes)
       setQuotes(quotesData);
       
       // Initialize liked quotes from the API response if available
