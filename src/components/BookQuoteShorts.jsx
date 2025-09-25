@@ -27,8 +27,7 @@ const apiService = {
         headers: {
           'Content-Type': 'application/json',
         },
-      });
-      
+      });      
       if (response.status!=200) throw new Error('Failed to like quote');
       return await response.data.data;
     } catch (error) {
@@ -187,7 +186,6 @@ const BookQuoteShorts = () => {
   };
 
   const currentQuote = quotes[currentQuoteIndex];
-console.log("currentQuote==",currentQuote);
 
   // Loading state
   if (loading) {
