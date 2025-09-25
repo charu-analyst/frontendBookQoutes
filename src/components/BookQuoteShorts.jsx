@@ -1,14 +1,14 @@
 import React, { useState,useEffect } from 'react';
 import { ChevronUp, ChevronDown, Heart, Share2, Play, Pause, BookOpen } from 'lucide-react';
 import { useAutoPlay } from '../hooks/useAutoPlay';
+const apiUrl='https://backendbookqoutes.onrender.com'||'http://localhost:5000'
 import axios from 'axios'
 // API service functions
 const apiService = {
   // Fetch all quotes
   async getQuotesList() {
     try {
-      const response = await axios.get('http://localhost:5000/api/quotes/quotesList');
-      console.log(response.status,"response=========",response.data)
+      const response = await axios.get(`${apiUrl}/api/quotes/quotesList`);
 
 
       if (response.status!=200) throw new Error('Failed to fetch quotes');
@@ -22,13 +22,13 @@ const apiService = {
   // Like a quote
   async likeQuote(quoteId) {
     try {
-      const response = await axios.put(`http://localhost:5000/api/quotes/${quoteId}/like`, {
+      const response = await axios.put(`${apiUrl}/api/quotes/${quoteId}/like`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
       });
-      console.log("response",response.data);
+     
       
       if (response.status!=200) throw new Error('Failed to like quote');
       return await response.data.data;
@@ -41,7 +41,7 @@ const apiService = {
   // Unlike a quote
   async unlikeQuote(quoteId) {
     try {
-      const response = await axios.put(`http://localhost:5000/api/quotes/${quoteId}/unlike`, {
+      const response = await axios.put(`${apiUrl}/api/quotes/${quoteId}/unlike`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -81,7 +81,6 @@ const BookQuoteShorts = () => {
       setLoading(true);
       setError(null);
       const quotesData = await apiService.getQuotesList();
-      console.log("quotes==",quotes)
       setQuotes(quotesData);
       
       // Initialize liked quotes from the API response if available
@@ -189,7 +188,6 @@ const BookQuoteShorts = () => {
   };
 
   const currentQuote = quotes[currentQuoteIndex];
-console.log("currentQuote==",currentQuote);
 
   // Loading state
   if (loading) {
