@@ -1,33 +1,34 @@
-import React, { useState,useEffect } from 'react';
-import { ChevronUp, ChevronDown, Heart, Share2, Play, Pause, BookOpen } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronUp, ChevronDown, Heart, Share2, Play, Pause, BookOpen, User, LogOut } from 'lucide-react';
 import { useAutoPlay } from '../hooks/useAutoPlay';
-const apiUrl='https://backendbookqoutes.onrender.com'||'http://localhost:5000'
-import axios from 'axios'
+import axios from 'axios';
+
+const apiUrl = 'https://backendbookqoutes.onrender.com' || 'http://localhost:5000';
+
 // API service functions
 const apiService = {
-  // Fetch all quotes
   async getQuotesList() {
     try {
-      const response = await axios.get(`${apiUrl}/api/quotes/quotesList`);
+      const token = localStorage.getItem('authToken');
+            const response = await axios.get(`${apiUrl}/api/quotes/quotesList`);
 
 
       if (response.status!=200) throw new Error('Failed to fetch quotes');
       return await response.data.data;
+
     } catch (error) {
       console.error('Error fetching quotes:', error);
       throw error;
     }
   },
 
-  // Like a quote
   async likeQuote(quoteId) {
     try {
-      const response = await axios.put(`${apiUrl}/api/quotes/${quoteId}/like`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+     const token = localStorage.getItem('authToken');
+    if (!token) throw new Error('No authentication token found');
+
+       const response = await axios.put(`${apiUrl}/api/quotes/${quoteId}/like`);
+     
       
       if (response.status!=200) throw new Error('Failed to like quote');
       return await response.data.data;
@@ -37,16 +38,11 @@ const apiService = {
     }
   },
 
-  // Unlike a quote
   async unlikeQuote(quoteId) {
     try {
-      const response = await axios.put(`${apiUrl}/api/quotes/${quoteId}/unlike`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-       if (response.status!=200) throw new Error('Failed to unlike quote');
+      const token = localStorage.getItem('authToken');
+      const response = await axios.put(`${apiUrl}/api/quotes/${quoteId}/unlike`);
+      if (response.status!=200) throw new Error('Failed to like quote');
       return await response.data.data;
     } catch (error) {
       console.error('Error unliking quote:', error);
@@ -55,13 +51,16 @@ const apiService = {
   },
 };
 
-const Loader=()=>{
-    return(
-        <div>Loading...</div>
-    );
+const Loader = () => {
+  return (
+    <div className="flex flex-col items-center space-y-4 text-white">
+      <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+      <p>Loading quotes...</p>
+    </div>
+  );
 };
 
-const BookQuoteShorts = () => {
+const BookQuoteShorts = ({ user, onLogout }) => {
   const [quotes, setQuotes] = useState([]);
   const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(false);
@@ -69,8 +68,8 @@ const BookQuoteShorts = () => {
   const [transitioning, setTransitioning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
-  // Fetch quotes on component mount
   useEffect(() => {
     fetchQuotes();
   }, []);
@@ -82,12 +81,11 @@ const BookQuoteShorts = () => {
       const quotesData = await apiService.getQuotesList();
       setQuotes(quotesData);
       
-      // Initialize liked quotes from the API response if available
       if (quotesData.length > 0) {
         const initialLikedQuotes = new Set();
         quotesData.forEach(quote => {
-          if (quote.isLiked) {
-            initialLikedQuotes.add(quote.id);
+          if (quote.likes && quote.likes.length > 0) {
+            initialLikedQuotes.add(quote._id);
           }
         });
         setLikedQuotes(initialLikedQuotes);
@@ -118,14 +116,17 @@ const BookQuoteShorts = () => {
     }, 150);
   };
 
-  // Use custom hook for auto-play
   useAutoPlay(isAutoPlay, nextQuote, currentQuoteIndex);
 
   const toggleLike = async (quoteId) => {
+    if (!user) {
+      alert('Please sign in to like quotes');
+      return;
+    }
+
     const wasLiked = likedQuotes.has(quoteId);
     const originalLikedQuotes = new Set(likedQuotes);
     
-    // Optimistic update
     setLikedQuotes(prev => {
       const newLiked = new Set(prev);
       if (wasLiked) {
@@ -144,7 +145,6 @@ const BookQuoteShorts = () => {
       }
     } catch (error) {
       console.error('Error toggling like:', error);
-      // Revert optimistic update on error
       setLikedQuotes(originalLikedQuotes);
       alert('Failed to update like. Please try again.');
     }
@@ -152,7 +152,7 @@ const BookQuoteShorts = () => {
 
   const handleShare = async (quote) => {
     const shareData = {
-      title: `Quote from ${quote.book}`,
+      title: `Quote from ${quote.bookTitle}`,
       text: `"${quote.text}" - ${quote.author}`,
       url: window.location.href
     };
@@ -161,14 +161,12 @@ const BookQuoteShorts = () => {
       if (navigator.share && navigator.canShare(shareData)) {
         await navigator.share(shareData);
       } else {
-        await navigator.clipboard.writeText(`"${quote.text}" - ${quote.author}, ${quote.book}`);
+        await navigator.clipboard.writeText(`"${quote.text}" - ${quote.author}, ${quote.bookTitle}`);
         alert('Quote copied to clipboard!');
       }
     } catch (error) {
-      console.error('Error sharing:', error);
-      // Fallback to clipboard
       try {
-        await navigator.clipboard.writeText(`"${quote.text}" - ${quote.author}, ${quote.book}`);
+        await navigator.clipboard.writeText(`"${quote.text}" - ${quote.author}, ${quote.bookTitle}`);
         alert('Quote copied to clipboard!');
       } catch (clipboardError) {
         console.error('Clipboard error:', clipboardError);
@@ -187,21 +185,15 @@ const BookQuoteShorts = () => {
   };
 
   const currentQuote = quotes[currentQuoteIndex];
-console.log("currentQuote==",currentQuote);
 
-  // Loading state
   if (loading) {
     return (
       <div className="relative w-full h-screen bg-black flex items-center justify-center">
-        <div className="flex flex-col items-center space-y-4 text-white">
-          <Loader className="w-8 h-8 animate-spin" />
-          <p>Loading quotes...</p>
-        </div>
+        <Loader />
       </div>
     );
   }
 
-  // Error state
   if (error) {
     return (
       <div className="relative w-full h-screen bg-black flex items-center justify-center">
@@ -218,7 +210,6 @@ console.log("currentQuote==",currentQuote);
     );
   }
 
-  // No quotes state
   if (quotes.length === 0) {
     return (
       <div className="relative w-full h-screen bg-black flex items-center justify-center">
@@ -242,13 +233,45 @@ console.log("currentQuote==",currentQuote);
           <BookOpen className="w-6 h-6" />
           <h1 className="text-xl font-bold">Book Quotes</h1>
         </div>
-        <button
-          onClick={() => setIsAutoPlay(!isAutoPlay)}
-          className="flex items-center space-x-2 bg-black bg-opacity-30 rounded-full px-3 py-2 hover:bg-opacity-50 transition-all"
-        >
-          {isAutoPlay ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-          <span className="text-sm">{isAutoPlay ? 'Pause' : 'Auto Play'}</span>
-        </button>
+        
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setIsAutoPlay(!isAutoPlay)}
+            className="flex items-center space-x-2 bg-black bg-opacity-30 rounded-full px-3 py-2 hover:bg-opacity-50 transition-all"
+          >
+            {isAutoPlay ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            <span className="text-sm">{isAutoPlay ? 'Pause' : 'Auto Play'}</span>
+          </button>
+
+          {/* User Menu */}
+          {user && (
+            <div className="relative">
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center space-x-2 bg-black bg-opacity-30 rounded-full px-3 py-2 hover:bg-opacity-50 transition-all"
+              >
+                <User className="w-4 h-4" />
+                <span className="text-sm">{user.name || 'User'}</span>
+              </button>
+              
+              {showUserMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-black bg-opacity-90 rounded-lg shadow-lg py-2 z-30">
+                  <div className="px-4 py-2 border-b border-gray-700">
+                    <p className="text-sm font-medium text-white">{user.name}</p>
+                    <p className="text-xs text-gray-400">{user.email}</p>
+                  </div>
+                  <button
+                    onClick={onLogout}
+                    className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-400 hover:bg-red-900 hover:bg-opacity-20 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main quote display */}
@@ -258,18 +281,16 @@ console.log("currentQuote==",currentQuote);
             transitioning ? 'opacity-0 transform scale-95' : 'opacity-100 transform scale-100'
           }`}
         >
-          {/* Quote text */}
           <blockquote className="text-2xl md:text-4xl lg:text-5xl font-light text-white leading-relaxed mb-8 text-shadow">
             "{currentQuote.text}"
           </blockquote>
           
-          {/* Author and book info */}
           <div className="text-white space-y-2">
             <p className="text-xl md:text-2xl font-medium text-shadow">
               — {currentQuote.author}
             </p>
             <p className="text-lg md:text-xl opacity-80 italic text-shadow">
-              {currentQuote.book}
+              {currentQuote.bookTitle}
             </p>
           </div>
         </div>
@@ -351,6 +372,14 @@ console.log("currentQuote==",currentQuote);
           }
         }}
       />
+
+      {/* Overlay to close user menu when clicking outside */}
+      {showUserMenu && (
+        <div 
+          className="absolute inset-0 z-20"
+          onClick={() => setShowUserMenu(false)}
+        />
+      )}
     </div>
   );
 };
